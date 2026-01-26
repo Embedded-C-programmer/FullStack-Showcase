@@ -1,0 +1,1 @@
+# This file makes blogspace a Python package
