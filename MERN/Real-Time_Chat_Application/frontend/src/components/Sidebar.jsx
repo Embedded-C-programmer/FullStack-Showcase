@@ -4,6 +4,7 @@ import { useChat } from '../context/ChatContext';
 import ConversationItem from './ConversationItem';
 import NewChatModal from './NewChatModal';
 import UserProfile from './UserProfile';
+import ThemeToggle from './ThemeToggle';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Sidebar = () => {
@@ -12,12 +13,26 @@ const Sidebar = () => {
     const [showNewChat, setShowNewChat] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [filter, setFilter] = useState('all'); // 'all', 'unread', 'groups'
 
     const filteredConversations = conversations.filter(conv => {
+        // Search filter
         const name = conv.type === 'group'
             ? conv.name
             : conv.participants.find(p => p._id !== user._id)?.username || '';
-        return name.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase());
+
+        // Type filter
+        if (filter === 'groups') {
+            return matchesSearch && conv.type === 'group';
+        }
+
+        if (filter === 'unread') {
+            // Check if there are unread messages (you can implement unread count logic)
+            return matchesSearch && conv.unreadCount > 0;
+        }
+
+        return matchesSearch;
     });
 
     return (
@@ -27,6 +42,7 @@ const Sidebar = () => {
                     <div className="sidebar-header-top">
                         <h2 className="sidebar-title gradient-text">ChatFlow</h2>
                         <div className="sidebar-actions">
+                            <ThemeToggle />
                             <motion.button
                                 className="icon-btn"
                                 onClick={() => setShowNewChat(true)}
@@ -52,6 +68,27 @@ const Sidebar = () => {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
+                    </div>
+
+                    <div className="conversation-filters">
+                        <button
+                            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
+                            onClick={() => setFilter('all')}
+                        >
+                            All
+                        </button>
+                        <button
+                            className={`filter-btn ${filter === 'unread' ? 'active' : ''}`}
+                            onClick={() => setFilter('unread')}
+                        >
+                            Unread
+                        </button>
+                        <button
+                            className={`filter-btn ${filter === 'groups' ? 'active' : ''}`}
+                            onClick={() => setFilter('groups')}
+                        >
+                            Groups
+                        </button>
                     </div>
                 </div>
 

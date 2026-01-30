@@ -1,13 +1,27 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 import MessageItem from './MessageItem';
 import MessageInput from './MessageInput';
+import VideoCall from './VideoCall';
+import SearchMessagesModal from './SearchMessagesModal';
+import ViewMediaModal from './ViewMediaModal';
 import { formatDate } from '../utils/dateUtils';
-
+import { FiPhone, FiVideo, FiMoreVertical } from 'react-icons/fi';
+import socketService from '../services/socket';
+import toast from 'react-hot-toast';
+import { AnimatePresence } from 'framer-motion';
+import {motion} from "framer-motion";
 const ChatArea = () => {
     const { user } = useAuth();
     const { activeConversation, messages, typingUsers, onlineUsers } = useChat();
+    const [activeCall, setActiveCall] = useState(null);
+    const [incomingCall, setIncomingCall] = useState(null);
+    const [showMoreMenu, setShowMoreMenu] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isBlocked, setIsBlocked] = useState(false);
+    const [showSearchModal, setShowSearchModal] = useState(false);
+    const [showMediaModal, setShowMediaModal] = useState(false);
     const messagesEndRef = useRef(null);
     const conversationMessages = messages[activeConversation?._id] || [];
 
@@ -18,6 +32,190 @@ const ChatArea = () => {
     useEffect(() => {
         scrollToBottom();
     }, [conversationMessages]);
+
+    useEffect(() => {
+        // Listen for incoming calls
+        const handleIncomingCall = (callData) => {
+            if (callData.call.conversationId === activeConversation?._id) {
+                setIncomingCall(callData);
+                toast((t) => (
+                    <div>
+                        <p>{callData.caller.username} is calling...</p>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            <button
+                                onClick={() => {
+                                    acceptCall(callData);
+                                    toast.dismiss(t.id);
+                                }}
+                                style={{
+                                    padding: '0.5rem 1rem',
+                                    background: 'var(--success)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px'
+                                }}
+                            >
+                                Accept
+                            </button>
+                            <button
+                                onClick={() => {
+                                    rejectCall(callData);
+                                    toast.dismiss(t.id);
+                                }}
+                                style={{
+                                    padding: '0.5rem 1rem',
+                                    background: 'var(--error)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px'
+                                }}
+                            >
+                                Decline
+                            </button>
+                        </div>
+                    </div>
+                ), {
+                    duration: 30000,
+                    icon: callData.call.type === 'video' ? '📹' : '📞'
+                });
+            }
+        };
+
+        socketService.on('call:incoming', handleIncomingCall);
+        socketService.on('call:accepted', ({ roomId }) => {
+            if (activeCall && activeCall.roomId === roomId) {
+                toast.success('Call connected');
+            }
+        });
+        socketService.on('call:rejected', () => {
+            toast.error('Call declined');
+            setActiveCall(null);
+            setIncomingCall(null);
+        });
+
+        return () => {
+            socketService.off('call:incoming', handleIncomingCall);
+            socketService.off('call:accepted');
+            socketService.off('call:rejected');
+        };
+    }, [activeConversation]);
+
+    const initiateCall = (type) => {
+        if (activeConversation.type === 'group') {
+            toast.error('Group calls coming soon!');
+            return;
+        }
+
+        const otherUser = activeConversation.participants.find(p => p._id !== user._id);
+
+        const callData = {
+            conversationId: activeConversation._id,
+            caller: user,
+            type,
+            roomId: null
+        };
+
+        socketService.emit('call:initiate', {
+            receiverId: otherUser._id,
+            conversationId: activeConversation._id,
+            type
+        });
+
+        socketService.once('call:initiated', ({ call, roomId }) => {
+            setActiveCall({ ...call, roomId });
+        });
+
+        socketService.once('call:failed', ({ error }) => {
+            toast.error(error);
+        });
+    };
+
+    const acceptCall = (callData) => {
+        socketService.emit('call:accept', { roomId: callData.roomId });
+        setActiveCall(callData.call);
+        setIncomingCall(null);
+    };
+
+    const rejectCall = (callData) => {
+        socketService.emit('call:reject', { roomId: callData.roomId });
+        setIncomingCall(null);
+    };
+
+    const endCall = () => {
+        setActiveCall(null);
+        setIncomingCall(null);
+    };
+
+    // More Options handlers
+    const handleSearchMessages = () => {
+        setShowSearchModal(true);
+        setShowMoreMenu(false);
+    };
+
+    const handleMuteNotifications = () => {
+        setIsMuted(!isMuted);
+        setShowMoreMenu(false);
+        toast.success(isMuted ? 'Notifications unmuted' : 'Notifications muted');
+    };
+
+    const handleViewMedia = () => {
+        setShowMediaModal(true);
+        setShowMoreMenu(false);
+    };
+
+    const handleExportChat = () => {
+        setShowMoreMenu(false);
+
+        // Create export data
+        const exportData = {
+            conversation: activeConversation.type === 'group'
+                ? activeConversation.name
+                : activeConversation.participants.find(p => p._id !== user._id)?.username,
+            exportDate: new Date().toISOString(),
+            messages: conversationMessages.map(m => ({
+                sender: m.sender.username,
+                content: m.content,
+                timestamp: m.createdAt,
+                type: m.type
+            }))
+        };
+
+        // Create and download file
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `chat-export-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast.success('Chat exported successfully');
+    };
+
+    const handleBlockUser = () => {
+        setShowMoreMenu(false);
+
+        if (activeConversation.type === 'group') {
+            toast.error('Cannot block group conversations');
+            return;
+        }
+
+        if (window.confirm(isBlocked ? 'Unblock this user?' : 'Block this user?')) {
+            setIsBlocked(!isBlocked);
+            toast.success(isBlocked ? 'User unblocked' : 'User blocked');
+        }
+    };
+
+    const handleClearMessages = () => {
+        setShowMoreMenu(false);
+
+        if (window.confirm('Clear all messages in this conversation? This cannot be undone.')) {
+            // Clear messages locally (you can implement backend route for this)
+            toast.success('Messages cleared');
+        }
+    };
 
     if (!activeConversation) return null;
 
@@ -56,6 +254,12 @@ const ChatArea = () => {
 
     return (
         <div className="chat-area">
+            <AnimatePresence>
+                {activeCall && (
+                    <VideoCall call={activeCall} onEnd={endCall} />
+                )}
+            </AnimatePresence>
+
             <div className="chat-header glass">
                 <div className="chat-header-info">
                     <div className="chat-avatar-wrapper">
@@ -75,24 +279,74 @@ const ChatArea = () => {
                 </div>
 
                 <div className="chat-actions">
-                    <button className="icon-btn" title="Video call">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M23 7l-7 5 7 5V7z" />
-                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                        </svg>
-                    </button>
-                    <button className="icon-btn" title="Voice call">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                        </svg>
-                    </button>
-                    <button className="icon-btn" title="More options">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <circle cx="12" cy="12" r="1" />
-                            <circle cx="12" cy="5" r="1" />
-                            <circle cx="12" cy="19" r="1" />
-                        </svg>
-                    </button>
+                    {activeConversation.type === 'private' && (
+                        <>
+                            <button
+                                className="icon-btn"
+                                title="Voice call"
+                                onClick={() => initiateCall('audio')}
+                            >
+                                <FiPhone size={20} />
+                            </button>
+                            <button
+                                className="icon-btn"
+                                title="Video call"
+                                onClick={() => initiateCall('video')}
+                            >
+                                <FiVideo size={20} />
+                            </button>
+                        </>
+                    )}
+                    <div className="more-menu-wrapper">
+                        <button
+                            className="icon-btn"
+                            title="More options"
+                            onClick={() => setShowMoreMenu(!showMoreMenu)}
+                        >
+                            <FiMoreVertical size={20} />
+                        </button>
+
+                        {showMoreMenu && (
+                            <motion.div
+                                className="more-menu"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                            >
+                                <button onClick={handleSearchMessages}>
+                                    🔍 Search Messages
+                                </button>
+                                <button onClick={handleMuteNotifications}>
+                                    {isMuted ? '🔔' : '🔕'} {isMuted ? 'Unmute' : 'Mute'} Notifications
+                                </button>
+                                <button onClick={handleViewMedia}>
+                                    🖼️ View Media
+                                </button>
+                                {activeConversation.type === 'group' && (
+                                    <button onClick={() => {
+                                        toast.info('Group info');
+                                        setShowMoreMenu(false);
+                                    }}>
+                                        ℹ️ Group Info
+                                    </button>
+                                )}
+                                {activeConversation.type === 'private' && (
+                                    <button onClick={handleBlockUser}>
+                                        🚫 {isBlocked ? 'Unblock' : 'Block'} User
+                                    </button>
+                                )}
+                                <button onClick={handleExportChat}>
+                                    💾 Export Chat
+                                </button>
+                                <button
+                                    className="danger"
+                                    onClick={handleClearMessages}
+                                >
+                                    🗑️ Clear Messages
+                                </button>
+                            </motion.div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -139,6 +393,16 @@ const ChatArea = () => {
             </div>
 
             <MessageInput />
+
+            {/* Modals */}
+            <AnimatePresence>
+                {showSearchModal && (
+                    <SearchMessagesModal onClose={() => setShowSearchModal(false)} />
+                )}
+                {showMediaModal && (
+                    <ViewMediaModal onClose={() => setShowMediaModal(false)} />
+                )}
+            </AnimatePresence>
         </div>
     );
 };

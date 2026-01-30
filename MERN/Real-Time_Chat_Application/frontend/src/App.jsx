@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ChatProvider } from './context/ChatContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import ThemeToggle from './components/ThemeToggle';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
@@ -42,7 +43,10 @@ function App() {
               path="/"
               element={
                 <ProtectedRoute>
-                  <Chat />
+                  <>
+                    {/* <ThemeToggle /> */}
+                    <Chat />
+                  </>
                 </ProtectedRoute>
               }
             />

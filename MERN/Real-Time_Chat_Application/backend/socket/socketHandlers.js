@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
+const { setupCallHandlers } = require('./callHandlers');
 
 // Store online users
 const onlineUsers = new Map();
@@ -75,7 +76,7 @@ const setupSocketHandlers = (io) => {
         // Handle sending messages
         socket.on('message:send', async (data) => {
             try {
-                const { conversationId, content, type = 'text' } = data;
+                const { conversationId, content, type = 'text', fileUrl, fileName, fileSize, mimeType, thumbnail } = data;
 
                 // Verify user is participant
                 const conversation = await Conversation.findOne({
@@ -88,7 +89,7 @@ const setupSocketHandlers = (io) => {
                 }
 
                 // Create message
-                const message = new Message({
+                const messageData = {
                     conversationId,
                     sender: socket.userId,
                     content,
@@ -97,8 +98,18 @@ const setupSocketHandlers = (io) => {
                         user: socket.userId,
                         readAt: new Date()
                     }]
-                });
+                };
 
+                // Add file data if present
+                if (fileUrl) {
+                    messageData.fileUrl = fileUrl;
+                    messageData.fileName = fileName;
+                    messageData.fileSize = fileSize;
+                    messageData.mimeType = mimeType;
+                    messageData.thumbnail = thumbnail;
+                }
+
+                const message = new Message(messageData);
                 await message.save();
                 await message.populate('sender', '-password');
 
@@ -193,9 +204,18 @@ const setupSocketHandlers = (io) => {
             try {
                 const { conversationId, messageIds } = data;
 
+                // Filter out temp message IDs (they start with 'temp-')
+                const validMessageIds = messageIds.filter(id =>
+                    typeof id === 'string' && !id.startsWith('temp-') && id.length === 24
+                );
+
+                if (validMessageIds.length === 0) {
+                    return; // No valid IDs to process
+                }
+
                 await Message.updateMany(
                     {
-                        _id: { $in: messageIds },
+                        _id: { $in: validMessageIds },
                         conversationId,
                         'readBy.user': { $ne: socket.userId }
                     },
@@ -212,7 +232,7 @@ const setupSocketHandlers = (io) => {
                 socket.to(conversationId).emit('messages:read', {
                     conversationId,
                     userId: socket.userId,
-                    messageIds
+                    messageIds: validMessageIds
                 });
 
             } catch (error) {
@@ -253,6 +273,9 @@ const setupSocketHandlers = (io) => {
                 console.error('Disconnect error:', error);
             }
         });
+
+        // Setup call handlers
+        setupCallHandlers(io, socket);
     });
 
     return io;

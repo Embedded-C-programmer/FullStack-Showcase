@@ -1,22 +1,49 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 import socketService from '../services/socket';
-import { motion } from 'framer-motion';
+import uploadService from '../services/upload';
+import { motion, AnimatePresence } from 'framer-motion';
+import EmojiPicker from 'emoji-picker-react';
+import { useDropzone } from 'react-dropzone';
+import { FiPaperclip, FiSmile, FiSend, FiMic, FiX, FiImage } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 const MessageInput = () => {
+    const { user } = useAuth();
     const { activeConversation, sendMessage } = useChat();
     const [message, setMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [uploadingFile, setUploadingFile] = useState(null);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [isRecording, setIsRecording] = useState(false);
     const textareaRef = useRef(null);
     const typingTimeoutRef = useRef(null);
+    const emojiPickerRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
 
     useEffect(() => {
-        // Reset textarea height when conversation changes
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
         }
         setMessage('');
+        setShowEmojiPicker(false);
     }, [activeConversation?._id]);
+
+    // Close emoji picker when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+                setShowEmojiPicker(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const handleTyping = () => {
         if (!isTyping) {
@@ -24,12 +51,10 @@ const MessageInput = () => {
             socketService.startTyping(activeConversation._id);
         }
 
-        // Clear existing timeout
         if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
         }
 
-        // Set new timeout to stop typing indicator
         typingTimeoutRef.current = setTimeout(() => {
             setIsTyping(false);
             socketService.stopTyping(activeConversation._id);
@@ -40,9 +65,97 @@ const MessageInput = () => {
         setMessage(e.target.value);
         handleTyping();
 
-        // Auto-resize textarea
         e.target.style.height = 'auto';
         e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+    };
+
+    const handleEmojiClick = (emojiData) => {
+        setMessage(prev => prev + emojiData.emoji);
+        textareaRef.current?.focus();
+    };
+
+    const handleFileSelect = async (files) => {
+        if (!files || files.length === 0) return;
+
+        const file = files[0];
+
+        try {
+            uploadService.validateFile(file);
+
+            setUploadingFile({
+                name: file.name,
+                size: uploadService.formatFileSize(file.size),
+                type: file.type
+            });
+
+            const fileData = await uploadService.uploadFile(file, (progress) => {
+                setUploadProgress(progress);
+            });
+
+            // Send message with file
+            const fileType = uploadService.getFileType(file.type);
+            sendMessage(activeConversation._id, file.name, {
+                type: fileType,
+                fileUrl: fileData.fileUrl,
+                fileName: fileData.fileName,
+                fileSize: fileData.fileSize,
+                mimeType: fileData.mimeType,
+                thumbnail: fileData.thumbnail
+            }, user?._id);
+
+            setUploadingFile(null);
+            setUploadProgress(0);
+            toast.success('File sent successfully');
+
+        } catch (error) {
+            console.error('File upload error:', error);
+            toast.error(error.message || 'Failed to upload file');
+            setUploadingFile(null);
+            setUploadProgress(0);
+        }
+    };
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop: handleFileSelect,
+        noClick: true,
+        noKeyboard: true
+    });
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.addEventListener('dataavailable', (event) => {
+                audioChunksRef.current.push(event.data);
+            });
+
+            mediaRecorder.addEventListener('stop', async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/ogg' });
+                const audioFile = new File([audioBlob], 'voice-message.ogg', { type: 'audio/ogg' });
+
+                stream.getTracks().forEach(track => track.stop());
+
+                await handleFileSelect([audioFile]);
+            });
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            toast.success('Recording started');
+        } catch (error) {
+            console.error('Recording error:', error);
+            toast.error('Failed to start recording');
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            toast.success('Recording stopped');
+        }
     };
 
     const handleSubmit = (e) => {
@@ -50,21 +163,18 @@ const MessageInput = () => {
 
         if (!message.trim()) return;
 
-        sendMessage(activeConversation._id, message.trim());
+        sendMessage(activeConversation._id, message.trim(), null, user?._id);
         setMessage('');
 
-        // Reset textarea height
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
         }
 
-        // Stop typing indicator
         if (isTyping) {
             setIsTyping(false);
             socketService.stopTyping(activeConversation._id);
         }
 
-        // Clear timeout
         if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
         }
@@ -78,53 +188,124 @@ const MessageInput = () => {
     };
 
     return (
-        <form className="message-input glass" onSubmit={handleSubmit}>
-            <button
-                type="button"
-                className="icon-btn"
-                title="Attach file"
-            >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                </svg>
-            </button>
+        <div {...getRootProps()} className="message-input-wrapper">
+            {isDragActive && (
+                <div className="drop-overlay">
+                    <FiImage size={48} />
+                    <p>Drop file to upload</p>
+                </div>
+            )}
 
-            <button
-                type="button"
-                className="icon-btn"
-                title="Emoji"
-            >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-                    <line x1="9" y1="9" x2="9.01" y2="9" />
-                    <line x1="15" y1="9" x2="15.01" y2="9" />
-                </svg>
-            </button>
+            {uploadingFile && (
+                <div className="upload-progress">
+                    <div className="upload-info">
+                        <span>{uploadingFile.name}</span>
+                        <button onClick={() => {
+                            setUploadingFile(null);
+                            setUploadProgress(0);
+                        }}>
+                            <FiX />
+                        </button>
+                    </div>
+                    <div className="progress-bar">
+                        <div
+                            className="progress-fill"
+                            style={{ width: `${uploadProgress}%` }}
+                        />
+                    </div>
+                    <span className="progress-text">{uploadProgress}%</span>
+                </div>
+            )}
 
-            <textarea
-                ref={textareaRef}
-                value={message}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                placeholder="Type a message..."
-                rows={1}
-                className="message-textarea"
-            />
+            <form className="message-input glass" onSubmit={handleSubmit}>
+                <input
+                    {...getInputProps()}
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                />
 
-            <motion.button
-                type="submit"
-                className="send-btn"
-                disabled={!message.trim()}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-            >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-            </motion.button>
-        </form>
+                <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Attach file"
+                >
+                    <FiPaperclip size={20} />
+                </button>
+
+                <div className="emoji-picker-wrapper" ref={emojiPickerRef}>
+                    <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        title="Emoji"
+                    >
+                        <FiSmile size={20} />
+                    </button>
+
+                    <AnimatePresence>
+                        {showEmojiPicker && (
+                            <motion.div
+                                className="emoji-picker-container"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                            >
+                                <EmojiPicker
+                                    onEmojiClick={handleEmojiClick}
+                                    theme="dark"
+                                    skinTonesDisabled
+                                    searchDisabled
+                                    height={350}
+                                    width="100%"
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                <textarea
+                    ref={textareaRef}
+                    value={message}
+                    onChange={handleChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type a message..."
+                    rows={1}
+                    className="message-textarea"
+                    disabled={uploadingFile || isRecording}
+                />
+
+                {isRecording ? (
+                    <motion.button
+                        type="button"
+                        className="icon-btn recording"
+                        onClick={stopRecording}
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ repeat: Infinity, duration: 1 }}
+                    >
+                        <FiMic size={20} />
+                    </motion.button>
+                ) : message.trim() ? (
+                    <motion.button
+                        type="submit"
+                        className="send-btn"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        <FiSend size={20} />
+                    </motion.button>
+                ) : (
+                    <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={startRecording}
+                        title="Voice message"
+                    >
+                        <FiMic size={20} />
+                    </button>
+                )}
+            </form>
+        </div>
     );
 };
 

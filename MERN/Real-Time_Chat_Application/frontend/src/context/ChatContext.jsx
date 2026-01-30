@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { conversationAPI, messageAPI } from '../services/api';
 import socketService from '../services/socket';
 import toast from 'react-hot-toast';
+import { useAuth } from './AuthContext';
 
 const ChatContext = createContext(null);
 
@@ -14,6 +15,7 @@ export const useChat = () => {
 };
 
 export const ChatProvider = ({ children }) => {
+    const { user } = useAuth();
     const [conversations, setConversations] = useState([]);
     const [activeConversation, setActiveConversation] = useState(null);
     const [messages, setMessages] = useState({});
@@ -111,12 +113,80 @@ export const ChatProvider = ({ children }) => {
     }, [selectConversation]);
 
     // Send message
-    const sendMessage = useCallback((conversationId, content) => {
-        socketService.sendMessage({
+    const sendMessage = useCallback((conversationId, content, fileData = null, userId) => {
+        const messageData = {
             conversationId,
             content,
-            type: 'text'
-        });
+            type: fileData?.type || 'text'
+        };
+
+        if (fileData) {
+            messageData.fileUrl = fileData.fileUrl;
+            messageData.fileName = fileData.fileName;
+            messageData.fileSize = fileData.fileSize;
+            messageData.mimeType = fileData.mimeType;
+            messageData.thumbnail = fileData.thumbnail;
+        }
+
+        socketService.sendMessage(messageData);
+
+        // Optimistic update - add message immediately to UI with correct sender
+        const tempMessage = {
+            _id: 'temp-' + Date.now(),
+            conversationId,
+            content,
+            type: messageData.type,
+            sender: {
+                _id: userId, // Use actual user ID
+                username: 'You',
+                avatar: ''
+            },
+            createdAt: new Date().toISOString(),
+            readBy: [{
+                user: userId,
+                readAt: new Date()
+            }],
+            temp: true,
+            ...messageData
+        };
+
+        setMessages(prev => ({
+            ...prev,
+            [conversationId]: [...(prev[conversationId] || []), tempMessage]
+        }));
+
+        // Update conversation list immediately
+        setConversations(prev =>
+            prev.map(conv =>
+                conv._id === conversationId
+                    ? {
+                        ...conv,
+                        lastMessage: tempMessage,
+                        lastMessageAt: tempMessage.createdAt
+                    }
+                    : conv
+            ).sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt))
+        );
+    }, []);
+
+    // Edit message
+    const editMessage = useCallback((messageId, content) => {
+        socketService.editMessage({ messageId, content });
+    }, []);
+
+    // Delete message
+    const deleteMessage = useCallback((messageId, conversationId) => {
+        // Optimistic update - remove immediately
+        setMessages(prev => ({
+            ...prev,
+            [conversationId]: (prev[conversationId] || []).map(m =>
+                m._id === messageId
+                    ? { ...m, deleted: true, content: 'This message has been deleted' }
+                    : m
+            )
+        }));
+
+        socketService.deleteMessage({ messageId });
     }, []);
 
     // Setup socket listeners
@@ -125,10 +195,15 @@ export const ChatProvider = ({ children }) => {
 
         // New message
         const handleNewMessage = ({ message, conversationId }) => {
-            setMessages(prev => ({
-                ...prev,
-                [conversationId]: [...(prev[conversationId] || []), message]
-            }));
+            setMessages(prev => {
+                const currentMessages = prev[conversationId] || [];
+                // Remove temp message if exists and filter out any remaining temp messages
+                const filtered = currentMessages.filter(m => !m.temp && !m._id.toString().startsWith('temp-'));
+                return {
+                    ...prev,
+                    [conversationId]: [...filtered, message]
+                };
+            });
 
             // Update conversation last message
             setConversations(prev =>
@@ -234,7 +309,9 @@ export const ChatProvider = ({ children }) => {
         selectConversation,
         createPrivateConversation,
         createGroupConversation,
-        sendMessage
+        sendMessage,
+        editMessage,
+        deleteMessage
     };
 
     return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

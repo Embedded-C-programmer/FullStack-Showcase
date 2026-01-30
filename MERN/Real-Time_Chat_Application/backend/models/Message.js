@@ -19,8 +19,23 @@ const messageSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['text', 'image', 'file', 'system'],
+        enum: ['text', 'image', 'video', 'audio', 'file', 'system'],
         default: 'text'
+    },
+    fileUrl: {
+        type: String
+    },
+    fileName: {
+        type: String
+    },
+    fileSize: {
+        type: Number
+    },
+    mimeType: {
+        type: String
+    },
+    thumbnail: {
+        type: String
     },
     readBy: [{
         user: {

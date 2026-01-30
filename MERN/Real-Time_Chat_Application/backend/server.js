@@ -4,11 +4,17 @@ const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
+const path = require('path');
 
 const authRoutes = require('./routes/auth');
 const conversationRoutes = require('./routes/conversations');
 const messageRoutes = require('./routes/messages');
+const uploadRoutes = require('./routes/upload');
 const { setupSocketHandlers } = require('./socket/socketHandlers');
+const logger = require('./config/logger');
 
 const app = express();
 const server = http.createServer(app);
@@ -21,15 +27,31 @@ const io = new Server(server, {
         credentials: true
     },
     pingTimeout: 60000,
-    pingInterval: 25000
+    pingInterval: 25000,
+    maxHttpBufferSize: 1e8 // 100MB for file transfers
 });
 
-// Middleware
+// Security middleware
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.'
+});
+app.use('/api/', limiter);
+
+// Compression
+app.use(compression());
+
+// CORS
 // app.use(cors({
 //     origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
 //     credentials: true
 // }));
-
 app.use(
     cors({
         origin: [
@@ -40,12 +62,19 @@ app.use(
     })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parsers
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Static files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Request logging
 app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    logger.info(`${req.method} ${req.path}`, {
+        ip: req.ip,
+        userAgent: req.get('user-agent')
+    });
     next();
 });
 
@@ -54,7 +83,8 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        memory: process.memoryUsage()
     });
 });
 
@@ -62,6 +92,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -70,7 +101,7 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-    console.error('Error:', err);
+    logger.error('Error:', err);
     res.status(err.status || 500).json({
         error: err.message || 'Internal server error'
     });
@@ -79,33 +110,62 @@ app.use((err, req, res, next) => {
 // Setup Socket.io handlers
 setupSocketHandlers(io);
 
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => {
-        console.log('✓ Connected to MongoDB');
-
-        // Start server
-        const PORT = process.env.PORT || 5000;
-        server.listen(PORT, () => {
-            console.log(`✓ Server running on port ${PORT}`);
-            console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
+// MongoDB connection with retry logic
+const connectDB = async (retries = 5) => {
+    try {
+        await mongoose.connect(process.env.MONGODB_URI, {
+            // useNewUrlParser: true,
+            // useUnifiedTopology: true
         });
-    })
-    .catch((error) => {
-        console.error('MongoDB connection error:', error);
-        process.exit(1);
+        logger.info('✓ Connected to MongoDB');
+    } catch (error) {
+        logger.error('MongoDB connection error:', error);
+
+        if (retries > 0) {
+            logger.info(`Retrying connection... (${retries} attempts left)`);
+            setTimeout(() => connectDB(retries - 1), 5000);
+        } else {
+            logger.error('Failed to connect to MongoDB after multiple attempts');
+            process.exit(1);
+        }
+    }
+};
+
+connectDB().then(() => {
+    // Start server
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => {
+        logger.info(`✓ Server running on port ${PORT}`);
+        logger.info(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
     });
+});
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-    console.log('SIGTERM received, shutting down gracefully...');
+    logger.info('SIGTERM received, shutting down gracefully...');
     server.close(() => {
-        console.log('Server closed');
+        logger.info('Server closed');
         mongoose.connection.close(false, () => {
-            console.log('MongoDB connection closed');
+            logger.info('MongoDB connection closed');
             process.exit(0);
         });
     });
 });
 
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception:', error);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+});
+
 module.exports = { app, server, io };
+
+
+
+
+
