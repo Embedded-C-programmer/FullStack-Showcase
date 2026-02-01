@@ -1,4 +1,3 @@
-// ==================== frontend/src/services/socket.js (ENHANCED) ====================
 import { io } from 'socket.io-client';
 
 let socket = null;

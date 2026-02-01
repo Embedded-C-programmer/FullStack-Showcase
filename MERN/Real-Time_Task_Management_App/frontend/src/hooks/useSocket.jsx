@@ -1,4 +1,4 @@
-// ==================== frontend/src/hooks/useSocket.js (ENHANCED) ====================
+
 import { useEffect, useState, useRef } from 'react';
 import { initSocket, getSocket, isSocketConnected } from '../services/socket';
 

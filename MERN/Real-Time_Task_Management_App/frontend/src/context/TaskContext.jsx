@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getTasks, createTask, updateTask, deleteTask } from '../services/api';
 import { useSocket } from '../hooks/useSocket';
+import { useAuth } from './AuthContext';
 
 const TaskContext = createContext();
 
@@ -20,6 +21,7 @@ export const TaskProvider = ({ children }) => {
     const [optimisticUpdates, setOptimisticUpdates] = useState(new Set());
 
     const socket = useSocket();
+    const { user } = useAuth(); // Get current user
 
     useEffect(() => {
         loadTasks();
@@ -31,7 +33,6 @@ export const TaskProvider = ({ children }) => {
         const handleTaskCreated = (task) => {
             setTasks(prev => {
                 const validTasks = Array.isArray(prev) ? prev : [];
-                // Check if task already exists (by _id)
                 if (validTasks.some(t => t._id === task._id)) {
                     console.log('Task already exists, skipping:', task._id);
                     return validTasks;
@@ -39,7 +40,6 @@ export const TaskProvider = ({ children }) => {
                 console.log('Adding task from socket:', task._id);
                 return [...validTasks, task];
             });
-            // Remove from optimistic updates
             setOptimisticUpdates(prev => {
                 const next = new Set(prev);
                 next.delete(task._id);
@@ -122,6 +122,9 @@ export const TaskProvider = ({ children }) => {
             throw new Error('Task title is required');
         }
 
+        // Get current user email
+        const currentUserEmail = user?.email || localStorage.getItem('userEmail') || 'anonymous';
+
         const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         const optimisticTask = {
             _id: tempId,
@@ -131,10 +134,9 @@ export const TaskProvider = ({ children }) => {
             assignedTo: null,
             assignedBy: null,
             completedBy: null,
-            createdBy: localStorage.getItem('userEmail') || 'anonymous'
+            createdBy: currentUserEmail  // ✅ USE CURRENT USER EMAIL
         };
 
-        // Add to optimistic updates set
         setOptimisticUpdates(prev => new Set(prev).add(tempId));
 
         // IMMEDIATELY add to tasks
@@ -144,20 +146,23 @@ export const TaskProvider = ({ children }) => {
         });
 
         try {
-            const response = await createTask({ title: title.trim() });
+            // ✅ SEND USER EMAIL TO BACKEND
+            const response = await createTask({
+                title: title.trim(),
+                createdBy: currentUserEmail  // Include user email in request
+            });
+
             const newTask = response.data || response;
 
-            console.log('Task created successfully:', newTask._id);
+            console.log('Task created successfully:', newTask._id, 'by', newTask.createdBy);
 
             // Replace temp task with real task
             setTasks(prev => {
                 const validTasks = Array.isArray(prev) ? prev : [];
-                // Remove temp and add real (avoid duplicates)
                 const filtered = validTasks.filter(t => t._id !== tempId && t._id !== newTask._id);
                 return [...filtered, newTask];
             });
 
-            // Remove from optimistic updates
             setOptimisticUpdates(prev => {
                 const next = new Set(prev);
                 next.delete(tempId);
@@ -165,14 +170,10 @@ export const TaskProvider = ({ children }) => {
                 return next;
             });
 
-            // DON'T emit to socket - backend does this
-            // The socket will broadcast to OTHER users, not back to us
-
             return newTask;
         } catch (err) {
             console.error('Error creating task:', err);
 
-            // Remove optimistic task on error
             setTasks(prev => {
                 const validTasks = Array.isArray(prev) ? prev : [];
                 return validTasks.filter(t => t._id !== tempId);
@@ -187,7 +188,7 @@ export const TaskProvider = ({ children }) => {
             setError('Failed to create task');
             throw err;
         }
-    }, [socket]);
+    }, [user]);
 
     const handleUpdateTask = useCallback(async (id, updates) => {
         const validTasks = Array.isArray(tasks) ? tasks : [];
@@ -197,19 +198,33 @@ export const TaskProvider = ({ children }) => {
             throw new Error('Task not found');
         }
 
+        // Get current user email for updates
+        const currentUserEmail = user?.email || localStorage.getItem('userEmail');
+
+        // Add user info to updates if relevant
+        const updatedData = { ...updates };
+
+        // If completing a task, track who completed it
+        if (updates.completed === true && !updates.completedBy) {
+            updatedData.completedBy = currentUserEmail;
+        }
+
+        // If assigning a task, track who assigned it
+        if (updates.assignedTo && !updates.assignedBy) {
+            updatedData.assignedBy = currentUserEmail;
+        }
+
         setOptimisticUpdates(prev => new Set(prev).add(id));
 
-        // IMMEDIATELY update in UI
         setTasks(prev => {
             const validTasks = Array.isArray(prev) ? prev : [];
-            return validTasks.map(t => t._id === id ? { ...t, ...updates } : t);
+            return validTasks.map(t => t._id === id ? { ...t, ...updatedData } : t);
         });
 
         try {
-            const response = await updateTask(id, updates);
+            const response = await updateTask(id, updatedData);
             const updatedTask = response.data || response;
 
-            // Update with server response
             setTasks(prev => {
                 const validTasks = Array.isArray(prev) ? prev : [];
                 return validTasks.map(t => t._id === id ? updatedTask : t);
@@ -225,7 +240,6 @@ export const TaskProvider = ({ children }) => {
         } catch (err) {
             console.error('Error updating task:', err);
 
-            // Rollback on error
             setTasks(prev => {
                 const validTasks = Array.isArray(prev) ? prev : [];
                 return validTasks.map(t => t._id === id ? originalTask : t);
@@ -240,7 +254,7 @@ export const TaskProvider = ({ children }) => {
             setError('Failed to update task');
             throw err;
         }
-    }, [tasks, socket]);
+    }, [tasks, user]);
 
     const handleDeleteTask = useCallback(async (id) => {
         const validTasks = Array.isArray(tasks) ? tasks : [];
@@ -250,7 +264,6 @@ export const TaskProvider = ({ children }) => {
             throw new Error('Task not found');
         }
 
-        // IMMEDIATELY remove from UI
         setTasks(prev => {
             const validTasks = Array.isArray(prev) ? prev : [];
             return validTasks.filter(t => t._id !== id);
@@ -261,7 +274,6 @@ export const TaskProvider = ({ children }) => {
         } catch (err) {
             console.error('Error deleting task:', err);
 
-            // Restore on error
             setTasks(prev => {
                 const validTasks = Array.isArray(prev) ? prev : [];
                 return [...validTasks, originalTask].sort((a, b) =>
@@ -274,7 +286,6 @@ export const TaskProvider = ({ children }) => {
         }
     }, [tasks, socket]);
 
-    // Ensure tasks is always an array before filtering
     const validTasks = Array.isArray(tasks) ? tasks : [];
 
     const filteredTasks = validTasks.filter(task => {
@@ -283,7 +294,6 @@ export const TaskProvider = ({ children }) => {
         return true;
     });
 
-    // CORRECT stats calculation
     const stats = {
         total: validTasks.length,
         completed: validTasks.filter(t => t.completed === true).length,

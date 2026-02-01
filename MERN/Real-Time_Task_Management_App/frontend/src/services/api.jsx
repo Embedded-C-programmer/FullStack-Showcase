@@ -1,7 +1,6 @@
-// ==================== frontend/src/services/api.js (ENHANCED) ====================
 import axios from 'axios';
-// process.env.REACT_APP_API_URL || 
-const API_URL ='http://localhost:5000';
+//process.env.REACT_APP_API_URL || 
+const API_URL = 'http://localhost:5000';
 
 const api = axios.create({
     baseURL: `${API_URL}/api`,
@@ -26,41 +25,35 @@ api.interceptors.request.use(
     }
 );
 
-// Response interceptor with better error handling
+// Response interceptor
 api.interceptors.response.use(
     (response) => {
-        // Return the data directly for consistency
         return response.data;
     },
     (error) => {
         if (error.response) {
-            // Server responded with error
             const message = error.response.data?.message || error.response.data?.error || 'Server error occurred';
 
             if (error.response.status === 401) {
                 localStorage.removeItem('token');
-                // window.location.href = '/login'; // Uncomment if you have auth
             }
 
             console.error('API Error:', message);
             return Promise.reject(new Error(message));
         } else if (error.request) {
-            // Request made but no response
             console.error('Network Error:', error.message);
             return Promise.reject(new Error('Network error. Please check your connection.'));
         } else {
-            // Something else happened
             console.error('Error:', error.message);
             return Promise.reject(error);
         }
     }
 );
 
-// Task API endpoints with error handling
+// Task API endpoints
 export const getTasks = async (params = {}) => {
     try {
         const response = await api.get('/tasks', { params });
-        // Handle different response structures
         if (Array.isArray(response)) return response;
         if (response.data && Array.isArray(response.data)) return response.data;
         if (response.tasks && Array.isArray(response.tasks)) return response.tasks;
@@ -86,7 +79,15 @@ export const createTask = async (taskData) => {
         if (!taskData || !taskData.title) {
             throw new Error('Task title is required');
         }
-        const response = await api.post('/tasks', taskData);
+
+        // ✅ ENSURE createdBy IS INCLUDED
+        const dataToSend = {
+            ...taskData,
+            createdBy: taskData.createdBy || localStorage.getItem('userEmail') || 'anonymous'
+        };
+
+        console.log('Creating task with data:', dataToSend);
+        const response = await api.post('/tasks', dataToSend);
         return response.data || response;
     } catch (error) {
         console.error('createTask error:', error);
@@ -116,7 +117,6 @@ export const deleteTask = async (id) => {
     }
 };
 
-// Auth API endpoints
 export const login = async (credentials) => {
     try {
         const response = await api.post('/auth/login', credentials);
