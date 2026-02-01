@@ -1286,3 +1286,31 @@ textarea:focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
 }
+
+/* Mobile close button */
+.mobile-close-btn {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .mobile-close-btn {
+        display: flex;
+    }
+}
+
+/* Better mobile menu positioning */
+@media (max-width: 768px) {
+    .mobile-menu-toggle {
+        bottom: 20px;
+        left: 20px;
+    }
+
+    .sidebar {
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Prevent body scroll when sidebar is open */
+    body.sidebar-open {
+        overflow: hidden;
+    }
+}
