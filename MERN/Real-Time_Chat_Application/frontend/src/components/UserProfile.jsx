@@ -24,7 +24,7 @@ const UserProfile = ({ onClose }) => {
             onClick={onClose}
         >
             <motion.div
-                className="modal profile-modal glass"
+                className="modal profile-modal user-profile-modal glass"
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}

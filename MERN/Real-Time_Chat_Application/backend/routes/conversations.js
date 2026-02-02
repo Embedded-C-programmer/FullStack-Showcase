@@ -12,12 +12,31 @@ router.get('/', authenticate, async (req, res) => {
     const conversations = await Conversation.find({
       participants: req.user._id
     })
-    .populate('participants', '-password')
-    .populate('lastMessage')
-    .populate('admin', '-password')
-    .sort({ lastMessageAt: -1 });
+      .populate('participants', '-password')
+      .populate('admin', '-password')
+      .sort({ lastMessageAt: -1 });
 
-    res.json({ conversations });
+    // For each conversation, get the last message that isn't deleted for current user
+    const conversationsWithMessages = await Promise.all(
+      conversations.map(async (conv) => {
+        const lastMessage = await Message.findOne({
+          conversationId: conv._id,
+          $or: [
+            { deletedFor: { $exists: false } },
+            { deletedFor: { $ne: req.user._id } }
+          ]
+        })
+          .sort({ createdAt: -1 })
+          .populate('sender', 'username avatar');
+
+        return {
+          ...conv.toObject(),
+          lastMessage: lastMessage || null
+        };
+      })
+    );
+
+    res.json({ conversations: conversationsWithMessages });
   } catch (error) {
     console.error('Get conversations error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -31,8 +50,8 @@ router.get('/:id', authenticate, async (req, res) => {
       _id: req.params.id,
       participants: req.user._id
     })
-    .populate('participants', '-password')
-    .populate('admin', '-password');
+      .populate('participants', '-password')
+      .populate('admin', '-password');
 
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
@@ -66,8 +85,8 @@ router.post('/private',
         type: 'private',
         participants: { $all: [req.user._id, userId], $size: 2 }
       })
-      .populate('participants', '-password')
-      .populate('lastMessage');
+        .populate('participants', '-password')
+        .populate('lastMessage');
 
       if (conversation) {
         return res.json({ conversation, isNew: false });

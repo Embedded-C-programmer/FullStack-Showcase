@@ -407,3 +407,213 @@ textarea {
 [data-theme="light"] .text-secondary {
   color: #6b7280 !important;
 }
+
+/* ThemeToggle.css */
+
+/* Main toast container */
+[data-theme="light"] .go3958317564,
+[data-theme="light"] [role="status"] {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+}
+
+/* Toast message text */
+[data-theme="light"] .go2465643020,
+[data-theme="light"] .go685806154 {
+  color: #111827 !important;
+}
+
+/* All nested divs in toast */
+[data-theme="light"] div[role="status"]>div,
+[data-theme="light"] div[role="status"]>div>div {
+  color: #111827 !important;
+}
+
+/* Success toast */
+[data-theme="light"] .go3958317564.go4109603782 {
+  background: #ffffff !important;
+}
+
+/* Error toast */
+[data-theme="light"] .go3958317564.go1348078303 {
+  background: #ffffff !important;
+}
+
+/* Toast icons */
+[data-theme="light"] .go3958317564 svg {
+  color: #111827 !important;
+}
+
+
+/* Profile modal container */
+[data-theme="light"] .user-profile-modal {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+/* Header */
+[data-theme="light"] .user-profile-modal .modal-header {
+  background: #f9fafb !important;
+  border-bottom-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .user-profile-modal .modal-header h2 {
+  color: #111827 !important;
+}
+
+/* Profile info */
+[data-theme="light"] .user-profile-modal .profile-info,
+[data-theme="light"] .user-profile-modal .profile-label {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .user-profile-modal .profile-value {
+  color: #111827 !important;
+}
+
+/* Bio section */
+[data-theme="light"] .user-profile-modal .profile-bio {
+  background: #f9fafb !important;
+  color: #111827 !important;
+  border-color: #e5e7eb !important;
+}
+
+/* Input fields */
+[data-theme="light"] .user-profile-modal input,
+[data-theme="light"] .user-profile-modal textarea {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .user-profile-modal input::placeholder,
+[data-theme="light"] .user-profile-modal textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Buttons */
+[data-theme="light"] .user-profile-modal .btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
+  color: white !important;
+}
+
+[data-theme="light"] .user-profile-modal .btn-secondary {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+}
+
+
+/* New chat modal */
+[data-theme="light"] .new-chat-modal {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+[data-theme="light"] .new-chat-modal h2,
+[data-theme="light"] .new-chat-modal h3 {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .new-chat-modal input {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .new-chat-modal .user-item {
+  background: #f9fafb !important;
+}
+
+[data-theme="light"] .new-chat-modal .user-item .user-name {
+  color: #111827 !important;
+}
+
+
+/* Fix profile-content specifically in light mode */
+[data-theme="light"] .profile-content {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+[data-theme="light"] .profile-content h3,
+[data-theme="light"] .profile-content h4,
+[data-theme="light"] .profile-content p,
+[data-theme="light"] .profile-content span,
+[data-theme="light"] .profile-content div {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .profile-content .profile-label {
+  color: #6b7280 !important;
+}
+
+[data-theme="light"] .profile-content .profile-value {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .profile-content .profile-avatar-section {
+  background: #f9fafb !important;
+}
+
+[data-theme="light"] .profile-content .profile-info h3 {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .profile-content .profile-info p {
+  color: #6b7280 !important;
+}
+
+[data-theme="light"] .profile-content .profile-stats {
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .profile-content .stat-value {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .profile-content .stat-label {
+  color: #6b7280 !important;
+}
+
+[data-theme="light"] .profile-content .profile-section {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .profile-content .profile-section h4 {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .profile-content .bio-text {
+  background: #f9fafb !important;
+  color: #111827 !important;
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .profile-content textarea {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .profile-content textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+[data-theme="light"] .profile-content .edit-btn,
+[data-theme="light"] .profile-content .save-btn,
+[data-theme="light"] .profile-content .cancel-btn {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .profile-content .save-btn {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
+  color: white !important;
+}
+
+[data-theme="light"] .profile-content .cancel-btn {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+}
