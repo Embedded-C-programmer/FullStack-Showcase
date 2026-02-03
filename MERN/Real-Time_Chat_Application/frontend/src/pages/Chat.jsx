@@ -109,14 +109,10 @@ const Chat = () => {
             <div className="chat-container mobile">
                 {!activeConversation ? (
                     // Show sidebar when no conversation selected
-                    <div className="sidebar mobile-sidebar">
-                        <Sidebar />
-                    </div>
+                    <Sidebar isMobile={true} />
                 ) : (
                     // Show chat area with back button when conversation selected
-                    <div className="chat-area-mobile">
-                        <ChatArea onBack={handleBackToSidebar} />
-                    </div>
+                    <ChatArea onBack={handleBackToSidebar} />
                 )}
             </div>
         );

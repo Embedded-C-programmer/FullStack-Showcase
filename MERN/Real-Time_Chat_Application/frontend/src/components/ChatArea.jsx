@@ -11,7 +11,7 @@ import { FiPhone, FiVideo, FiMoreVertical } from 'react-icons/fi';
 import { authAPI, messageAPI } from '../services/api';
 import socketService from '../services/socket';
 import toast from 'react-hot-toast';
-import { AnimatePresence,motion } from 'framer-motion';
+import { AnimatePresence,motion  } from 'framer-motion';
 
 const ChatArea = ({ onBack }) => {
     const { user } = useAuth();
@@ -254,22 +254,24 @@ const ChatArea = ({ onBack }) => {
         if (activeConversation.type === 'group') {
             return {
                 name: activeConversation.name,
-                avatar: activeConversation.avatar,
+                avatar: activeConversation.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(activeConversation.name) + '&background=6366f1&color=fff&size=128&rounded=true&bold=true',
                 subtitle: `${activeConversation.participants.length} members`,
-                isOnline: false
+                isOnline: false,
+                isGroup: true
             };
         }
 
         const otherUser = activeConversation.participants.find(p => p._id !== user._id);
         return {
             name: otherUser?.username || 'Unknown User',
-            avatar: otherUser?.avatar,
+            avatar: otherUser?.avatar || `https://ui-avatars.com/api/?name=${otherUser?.username || 'U'}&background=random`,
             subtitle: onlineUsers.has(otherUser?._id) ? 'Online' : 'Offline',
-            isOnline: onlineUsers.has(otherUser?._id)
+            isOnline: onlineUsers.has(otherUser?._id),
+            isGroup: false
         };
     };
 
-    const { name, avatar, subtitle, isOnline } = getDisplayInfo();
+    const { name, avatar, subtitle, isOnline, isGroup } = getDisplayInfo();
     const typing = typingUsers[activeConversation._id];
 
     // Group messages by date
@@ -303,8 +305,18 @@ const ChatArea = ({ onBack }) => {
                         <img
                             src={avatar}
                             alt={name}
-                            className="chat-avatar"
+                            className={`chat-avatar ${isGroup ? 'group-avatar' : ''}`}
                         />
+                        {isGroup && (
+                            <span className="group-indicator">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                    <circle cx="9" cy="7" r="4" />
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                </svg>
+                            </span>
+                        )}
                         {activeConversation.type === 'private' && isOnline && (
                             <span className="status-indicator online"></span>
                         )}

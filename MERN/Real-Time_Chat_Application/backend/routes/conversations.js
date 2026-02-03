@@ -16,9 +16,10 @@ router.get('/', authenticate, async (req, res) => {
       .populate('admin', '-password')
       .sort({ lastMessageAt: -1 });
 
-    // For each conversation, get the last message that isn't deleted for current user
+    // For each conversation, get the last message and unread count
     const conversationsWithMessages = await Promise.all(
       conversations.map(async (conv) => {
+        // Get last message not deleted for current user
         const lastMessage = await Message.findOne({
           conversationId: conv._id,
           $or: [
@@ -29,9 +30,21 @@ router.get('/', authenticate, async (req, res) => {
           .sort({ createdAt: -1 })
           .populate('sender', 'username avatar');
 
+        // Count unread messages (not deleted for user and not read by user)
+        const unreadCount = await Message.countDocuments({
+          conversationId: conv._id,
+          sender: { $ne: req.user._id }, // Not sent by current user
+          $or: [
+            { deletedFor: { $exists: false } },
+            { deletedFor: { $ne: req.user._id } }
+          ],
+          'readBy.user': { $ne: req.user._id } // Not read by current user
+        });
+
         return {
           ...conv.toObject(),
-          lastMessage: lastMessage || null
+          lastMessage: lastMessage || null,
+          unreadCount: unreadCount || 0
         };
       })
     );

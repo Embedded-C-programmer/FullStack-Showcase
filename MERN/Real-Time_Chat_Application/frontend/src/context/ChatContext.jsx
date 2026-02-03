@@ -198,7 +198,7 @@ export const ChatProvider = ({ children }) => {
                 };
             });
 
-            // Update conversation last message
+            // Update conversation last message and reload to get updated unread count
             setConversations(prev =>
                 prev.map(conv =>
                     conv._id === conversationId
@@ -206,6 +206,13 @@ export const ChatProvider = ({ children }) => {
                         : conv
                 ).sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt))
             );
+
+            // Reload conversations to get accurate unread count
+            if (message.sender._id !== user._id) {
+                setTimeout(() => {
+                    loadConversations();
+                }, 500);
+            }
         };
 
         // Message edited
@@ -263,11 +270,14 @@ export const ChatProvider = ({ children }) => {
                     messageIds.includes(m._id)
                         ? {
                             ...m,
-                            readBy: [...m.readBy, { user: userId, readAt: new Date() }]
+                            readBy: [...(m.readBy || []), { user: userId, readAt: new Date() }]
                         }
                         : m
                 )
             }));
+
+            // Reload conversations to update unread count in sidebar
+            loadConversations();
         };
 
         socketService.on('message:new', handleNewMessage);
@@ -290,6 +300,40 @@ export const ChatProvider = ({ children }) => {
             socketService.off('messages:read', handleMessagesRead);
         };
     }, []);
+
+    // Mark messages as read when conversation is active and messages are loaded
+    useEffect(() => {
+        if (!activeConversation || !user) return;
+
+        const conversationMessages = messages[activeConversation._id] || [];
+        if (conversationMessages.length === 0) return;
+
+        // Find unread messages
+        const unreadMessageIds = conversationMessages
+            .filter(m => {
+                // Not sent by me
+                const notMine = m.sender && m.sender._id !== user._id;
+                // Not already read by me
+                const notRead = !m.readBy || !m.readBy.some(r => r.user === user._id);
+                // Has real ID (not temp)
+                const isReal = m._id && !m._id.toString().startsWith('temp-');
+                return notMine && notRead && isReal;
+            })
+            .map(m => m._id);
+
+        if (unreadMessageIds.length > 0) {
+            // Mark as read
+            socketService.markAsRead({
+                conversationId: activeConversation._id,
+                messageIds: unreadMessageIds
+            });
+
+            // Reload conversations after a delay to update unread count
+            setTimeout(() => {
+                loadConversations();
+            }, 1000);
+        }
+    }, [activeConversation, messages, user, loadConversations]);
 
     const value = {
         conversations,

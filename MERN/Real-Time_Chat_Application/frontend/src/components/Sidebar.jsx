@@ -182,7 +182,7 @@ import ThemeToggle from './ThemeToggle';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX } from 'react-icons/fi';
 
-const Sidebar = ({ onClose }) => {
+const Sidebar = ({ onClose, isMobile }) => {
     const { user, logout } = useAuth();
     const { conversations, loading } = useChat();
     const [showNewChat, setShowNewChat] = useState(false);
@@ -212,7 +212,7 @@ const Sidebar = ({ onClose }) => {
 
     return (
         <>
-            <div className="sidebar">
+            <div className={`sidebar ${isMobile ? 'mobile-sidebar' : ''}`}>
                 <div className="sidebar-header glass">
                     <div className="sidebar-header-top">
                         <h2 className="sidebar-title gradient-text">ChatFlow</h2>

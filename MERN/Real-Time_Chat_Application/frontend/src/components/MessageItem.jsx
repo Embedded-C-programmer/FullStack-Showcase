@@ -242,13 +242,13 @@ const MessageItem = ({ message, isOwn }) => {
       case 'image':
         return (
           <div className="message-image">
-            <img 
-              src={message.thumbnail ? `${API_URL}${message.thumbnail}` : fileUrl} 
+            <img
+              src={message.thumbnail ? `${API_URL}${message.thumbnail}` : fileUrl}
               alt={message.fileName}
               onClick={() => window.open(fileUrl, '_blank')}
             />
-            <a 
-              href={fileUrl} 
+            <a
+              href={fileUrl}
               download={message.fileName}
               className="download-btn"
               onClick={(e) => e.stopPropagation()}
@@ -289,8 +289,8 @@ const MessageItem = ({ message, isOwn }) => {
       case 'file':
       default:
         return (
-          <a 
-            href={fileUrl} 
+          <a
+            href={fileUrl}
             download={message.fileName}
             className="message-file"
           >
@@ -308,7 +308,7 @@ const MessageItem = ({ message, isOwn }) => {
         );
     }
   };
-  
+
   return (
     <motion.div
       className={`message ${isOwn ? 'own' : ''}`}
@@ -319,18 +319,18 @@ const MessageItem = ({ message, isOwn }) => {
       onMouseLeave={() => !isEditing && setShowMenu(false)}
     >
       {!isOwn && message.sender?.avatar && (
-        <img 
-          src={message.sender.avatar || `https://ui-avatars.com/api/?name=${message.sender.username}&background=random`} 
+        <img
+          src={message.sender.avatar || `https://ui-avatars.com/api/?name=${message.sender.username}&background=random`}
           alt={message.sender.username}
           className="message-avatar"
         />
       )}
-      
+
       <div className="message-content">
         {!isOwn && (
           <div className="message-sender">{message.sender.username}</div>
         )}
-        
+
         {message.fileUrl && renderFileContent()}
 
         {message.type === 'text' && (
@@ -372,21 +372,41 @@ const MessageItem = ({ message, isOwn }) => {
             )}
           </div>
         )}
-        
+
         <div className="message-footer">
           <span className="message-time">{time}</span>
-          {isOwn && (
+          {isOwn && !message.deleted && (
             <div className="message-status">
-              {message.readBy.length > 1 ? (
-                <svg className="check-icon read" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                  <polyline points="20 6 9 17 4 12" transform="translate(4, 0)"/>
-                </svg>
-              ) : (
-                <svg className="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              )}
+              {(() => {
+                // Check if message has been read by anyone other than sender
+                const readByOthers = message.readBy?.filter(r => r.user !== message.sender._id) || [];
+                const isDelivered = message._id && !message._id.toString().startsWith('temp-');
+
+                if (readByOthers.length > 0) {
+                  // Blue double tick - Read
+                  return (
+                    <svg className="check-icon read-blue" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4fc3f7" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                      <polyline points="16 6 5 17 0 12" />
+                    </svg>
+                  );
+                } else if (isDelivered) {
+                  // Gray double tick - Delivered but not read
+                  return (
+                    <svg className="check-icon delivered" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                      <polyline points="16 6 5 17 0 12" />
+                    </svg>
+                  );
+                } else {
+                  // Single tick - Sent but not delivered
+                  return (
+                    <svg className="check-icon sent" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  );
+                }
+              })()}
             </div>
           )}
         </div>
