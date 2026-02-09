@@ -93,6 +93,16 @@ const Login = () => {
                             {loading ? 'Signing in...' : 'Sign in'}
                         </button>
                     </div>
+                    <div>
+                        <div className="flex items-center justify-between mt-4">
+                            <Link
+                                to="/forgot-password"
+                                className="text-sm text-blue-600 hover:text-blue-500"
+                            >
+                                Forgot your password?
+                            </Link>
+                        </div>
+                    </div>
                 </form>
             </div>
         </div>

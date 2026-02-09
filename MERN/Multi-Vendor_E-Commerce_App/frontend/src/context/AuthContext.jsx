@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
-import jwtDecode  from 'jwt-decode';
+import  jwtDecode  from 'jwt-decode';
 
 // Configure axios defaults
 axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -20,6 +20,26 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [token, setToken] = useState(localStorage.getItem('token'));
     const [loading, setLoading] = useState(true);
+
+    // Set axios interceptor to always include token
+    useEffect(() => {
+        const interceptor = axios.interceptors.request.use(
+            (config) => {
+                const storedToken = localStorage.getItem('token');
+                if (storedToken) {
+                    config.headers.Authorization = `Bearer ${storedToken}`;
+                }
+                return config;
+            },
+            (error) => {
+                return Promise.reject(error);
+            }
+        );
+
+        return () => {
+            axios.interceptors.request.eject(interceptor);
+        };
+    }, []);
 
     // Set axios default headers
     useEffect(() => {

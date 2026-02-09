@@ -15,7 +15,7 @@ export const useCart = () => {
 export const CartProvider = ({ children }) => {
     const [cart, setCart] = useState(null);
     const [loading, setLoading] = useState(false);
-    const { isAuthenticated, token } = useAuth();
+    const { isAuthenticated } = useAuth();
 
     // Load cart when user is authenticated
     useEffect(() => {
@@ -27,40 +27,28 @@ export const CartProvider = ({ children }) => {
     }, [isAuthenticated]);
 
     // Load cart from server
-    // const loadCart = async () => {
-    //     try {
-    //         setLoading(true);
-    //         const res = await axios.get('/cart');
-    //         setCart(res.data.data);
-    //     } catch (error) {
-    //         console.error('Failed to load cart:', error);
-    //     } finally {
-    //         setLoading(false);
-    //     }
-    // };
-
-
     const loadCart = async () => {
         try {
             setLoading(true);
-
-            const res = await axios.get('/cart', {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
+            const res = await axios.get('/cart');
             setCart(res.data.data);
         } catch (error) {
-            console.error('Failed to load cart:', error.response?.data || error);
+            console.error('Failed to load cart:', error);
         } finally {
             setLoading(false);
         }
     };
 
-
     // Add item to cart
     const addToCart = async (productId, quantity = 1) => {
+        if (!isAuthenticated) {
+            return {
+                success: false,
+                message: 'Please login to add items to cart',
+                requiresAuth: true
+            };
+        }
+
         try {
             const res = await axios.post('/cart', { productId, quantity });
             setCart(res.data.data);

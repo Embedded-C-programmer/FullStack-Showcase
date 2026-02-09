@@ -1,7 +1,6 @@
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const Cart = require('../models/Cart');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // @desc    Create new order
 // @route   POST /api/orders
@@ -66,28 +65,13 @@ exports.createOrder = async (req, res, next) => {
         const tax = subtotal * 0.08; // 8% tax
         const total = subtotal + shipping + tax;
 
-        // Create Stripe Payment Intent
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount: Math.round(total * 100), // Convert to cents
-            currency: 'usd',
-            payment_method_types: ['card'],
-            metadata: {
-                userId: req.user.id.toString(),
-                items: JSON.stringify(orderItems.map(item => ({
-                    productId: item.product,
-                    quantity: item.quantity
-                })))
-            }
-        });
-
-        // Create order
+        // Create order without Stripe (for demo purposes)
         const order = await Order.create({
             user: req.user.id,
             items: orderItems,
             shippingAddress,
             paymentInfo: {
-                method: paymentMethod || 'stripe',
-                stripePaymentIntentId: paymentIntent.id,
+                method: paymentMethod || 'cash_on_delivery',
                 status: 'pending'
             },
             pricing: {
@@ -101,7 +85,7 @@ exports.createOrder = async (req, res, next) => {
         res.status(201).json({
             success: true,
             data: order,
-            clientSecret: paymentIntent.client_secret
+            message: 'Order created successfully! Payment will be collected on delivery.'
         });
     } catch (error) {
         next(error);
@@ -273,40 +257,29 @@ exports.confirmPayment = async (req, res, next) => {
             });
         }
 
-        // Verify payment with Stripe
-        const paymentIntent = await stripe.paymentIntents.retrieve(
-            order.paymentInfo.stripePaymentIntentId
+        // Auto-confirm payment for demo purposes
+        order.paymentInfo.status = 'succeeded';
+        order.paymentInfo.paidAt = Date.now();
+        order.status = 'confirmed';
+
+        // Update item statuses
+        order.items.forEach(item => {
+            item.status = 'confirmed';
+        });
+
+        // Clear user's cart
+        await Cart.findOneAndUpdate(
+            { user: req.user.id },
+            { items: [], totalAmount: 0 }
         );
 
-        if (paymentIntent.status === 'succeeded') {
-            order.paymentInfo.status = 'succeeded';
-            order.paymentInfo.paidAt = Date.now();
-            order.status = 'confirmed';
+        await order.save();
 
-            // Update item statuses
-            order.items.forEach(item => {
-                item.status = 'confirmed';
-            });
-
-            // Clear user's cart
-            await Cart.findOneAndUpdate(
-                { user: req.user.id },
-                { items: [], totalAmount: 0 }
-            );
-
-            await order.save();
-
-            res.status(200).json({
-                success: true,
-                message: 'Payment confirmed',
-                data: order
-            });
-        } else {
-            return res.status(400).json({
-                success: false,
-                message: 'Payment not completed'
-            });
-        }
+        res.status(200).json({
+            success: true,
+            message: 'Payment confirmed',
+            data: order
+        });
     } catch (error) {
         next(error);
     }
@@ -351,11 +324,8 @@ exports.cancelOrder = async (req, res, next) => {
             item.status = 'cancelled';
         });
 
-        // Refund if payment was made
+        // Mark as refunded if payment was made
         if (order.paymentInfo.status === 'succeeded') {
-            await stripe.refunds.create({
-                payment_intent: order.paymentInfo.stripePaymentIntentId
-            });
             order.paymentInfo.status = 'refunded';
         }
 

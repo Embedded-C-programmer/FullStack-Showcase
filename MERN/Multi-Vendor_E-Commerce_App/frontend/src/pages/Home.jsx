@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useCart } from '../context/CartContext';
@@ -9,6 +9,7 @@ const Home = () => {
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const { addToCart } = useCart();
+    const navigate = useNavigate();
 
     useEffect(() => {
         fetchFeaturedProducts();
@@ -29,6 +30,9 @@ const Home = () => {
         const result = await addToCart(productId, 1);
         if (result.success) {
             toast.success('Product added to cart!');
+        } else if (result.requiresAuth) {
+            toast.info('Please login to add items to cart');
+            setTimeout(() => navigate('/login'), 1500);
         } else {
             toast.error(result.message);
         }

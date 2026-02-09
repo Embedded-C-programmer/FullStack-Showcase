@@ -2,32 +2,37 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const {
-    register,
-    login,
-    getMe,
-    updateDetails,
-    updatePassword,
-    updateVendorInfo
+  register,
+  login,
+  getMe,
+  updateDetails,
+  updatePassword,
+  updateVendorInfo
 } = require('../controllers/authController');
+const {
+  requestPasswordReset,
+  verifyOTP,
+  resetPassword
+} = require('../controllers/passwordResetController');
 const { protect, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 
 // Validation rules
 const registerValidation = [
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Please provide a valid email'),
-    body('password')
-        .isLength({ min: 6 })
-        .withMessage('Password must be at least 6 characters'),
-    body('role')
-        .optional()
-        .isIn(['user', 'vendor'])
-        .withMessage('Invalid role')
+  body('name').trim().notEmpty().withMessage('Name is required'),
+  body('email').isEmail().withMessage('Please provide a valid email'),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters'),
+  body('role')
+    .optional()
+    .isIn(['user', 'vendor'])
+    .withMessage('Invalid role')
 ];
 
 const loginValidation = [
-    body('email').isEmail().withMessage('Please provide a valid email'),
-    body('password').notEmpty().withMessage('Password is required')
+  body('email').isEmail().withMessage('Please provide a valid email'),
+  body('password').notEmpty().withMessage('Password is required')
 ];
 
 // Routes
@@ -37,10 +42,15 @@ router.get('/me', protect, getMe);
 router.put('/updatedetails', protect, updateDetails);
 router.put('/updatepassword', protect, updatePassword);
 router.put(
-    '/vendor-info',
-    protect,
-    authorize('vendor'),
-    updateVendorInfo
+  '/vendor-info',
+  protect,
+  authorize('vendor'),
+  updateVendorInfo
 );
+
+// Password Reset Routes
+router.post('/forgot-password', requestPasswordReset);
+router.post('/verify-otp', verifyOTP);
+router.post('/reset-password', resetPassword);
 
 module.exports = router;
