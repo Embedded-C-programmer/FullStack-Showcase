@@ -9,7 +9,8 @@ const ViewMediaModal = ({ onClose }) => {
     const [filter, setFilter] = useState('all'); // 'all', 'images', 'videos', 'files'
 
     const conversationMessages = messages[activeConversation?._id] || [];
-    const API_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    // const API_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
     const mediaMessages = conversationMessages.filter(msg => {
         if (msg.deleted) return false;

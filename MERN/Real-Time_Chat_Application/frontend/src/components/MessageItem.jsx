@@ -216,7 +216,8 @@ const MessageItem = ({ message, isOwn }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const time = format(new Date(message.createdAt), 'HH:mm');
-  const API_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
+  // const API_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
+  const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
   const handleEdit = () => {
     if (editContent.trim() && editContent !== message.content) {
