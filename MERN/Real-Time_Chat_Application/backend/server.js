@@ -196,6 +196,7 @@ const io = new Server(server, {
             'http://localhost:5000',
             'http://localhost:5173',
             'http://localhost:5174',
+            'https://chat-application-y12a.onrender.com',
             process.env.CORS_ORIGIN
         ].filter(Boolean),
         methods: ['GET', 'POST'],
@@ -233,6 +234,7 @@ app.use(cors({
         'http://localhost:3000',
         'http://localhost:5173',
         'http://localhost:5174',
+        'https://chat-application-y12a.onrender.com',
         process.env.CORS_ORIGIN
     ].filter(Boolean),
     credentials: true
