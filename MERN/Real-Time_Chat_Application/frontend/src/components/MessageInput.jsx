@@ -339,6 +339,29 @@ const MessageInput = () => {
   const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const inputContainerRef = useRef(null);
+
+  // Handle mobile keyboard appearance
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 768 && inputContainerRef.current) {
+        // Detect keyboard open by viewport height change
+        const viewportHeight = window.visualViewport?.height || window.innerHeight;
+        const isKeyboardOpen = window.innerHeight - viewportHeight > 150;
+
+        if (isKeyboardOpen) {
+          inputContainerRef.current.classList.add('keyboard-open');
+        } else {
+          inputContainerRef.current.classList.remove('keyboard-open');
+        }
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      return () => window.visualViewport.removeEventListener('resize', handleResize);
+    }
+  }, []);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -379,7 +402,7 @@ const MessageInput = () => {
   const handleChange = (e) => {
     setMessage(e.target.value);
     handleTyping();
-    
+
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
@@ -396,7 +419,7 @@ const MessageInput = () => {
 
     try {
       uploadService.validateFile(file);
-      
+
       setUploadingFile({
         name: file.name,
         size: uploadService.formatFileSize(file.size),
@@ -450,9 +473,9 @@ const MessageInput = () => {
       mediaRecorder.addEventListener('stop', async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/ogg' });
         const audioFile = new File([audioBlob], 'voice-message.ogg', { type: 'audio/ogg' });
-        
+
         stream.getTracks().forEach(track => track.stop());
-        
+
         await handleFileSelect([audioFile]);
       });
 
@@ -481,12 +504,12 @@ const MessageInput = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (!message.trim()) return;
 
     sendMessage(activeConversation._id, message.trim(), null, user?._id);
     setMessage('');
-    
+
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -509,7 +532,7 @@ const MessageInput = () => {
   };
 
   return (
-    <div {...getRootProps()} className="message-input-wrapper">
+    <div {...getRootProps()} className="chat-input-container" ref={inputContainerRef}>
       {isDragActive && (
         <div className="drop-overlay">
           <FiImage size={48} />
@@ -529,8 +552,8 @@ const MessageInput = () => {
             </button>
           </div>
           <div className="progress-bar">
-            <div 
-              className="progress-fill" 
+            <div
+              className="progress-fill"
               style={{ width: `${uploadProgress}%` }}
             />
           </div>
@@ -545,8 +568,8 @@ const MessageInput = () => {
           style={{ display: 'none' }}
         />
 
-        <button 
-          type="button" 
+        <button
+          type="button"
           className="icon-btn"
           onClick={() => fileInputRef.current?.click()}
           title="Attach file"
@@ -555,8 +578,8 @@ const MessageInput = () => {
         </button>
 
         <div className="emoji-picker-wrapper" ref={emojiPickerRef}>
-          <button 
-            type="button" 
+          <button
+            type="button"
             className="icon-btn"
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             title="Emoji"
@@ -616,8 +639,8 @@ const MessageInput = () => {
             <FiSend size={20} />
           </motion.button>
         ) : (
-          <button 
-            type="button" 
+          <button
+            type="button"
             className="icon-btn"
             onClick={startRecording}
             title="Voice message"

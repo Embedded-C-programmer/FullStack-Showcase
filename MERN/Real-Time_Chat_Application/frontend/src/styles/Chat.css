@@ -1577,3 +1577,157 @@ textarea:focus-visible {
 [data-theme="light"] .group-indicator {
     border-color: #ffffff;
 }
+
+/* ========================================
+   MOBILE CHAT WINDOW FIXES
+   ======================================== */
+
+/* Fix for mobile viewport height - iOS Safari */
+@supports (-webkit-touch-callout: none) {
+  .chat-area {
+    height: -webkit-fill-available;
+  }
+}
+
+/* Mobile-specific chat area layout */
+@media (max-width: 768px) {
+  .chat-area {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh; /* Dynamic viewport height for mobile */
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  .chat-header {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+  
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 1rem;
+    min-height: 0; /* Important for flex child scrolling */
+  }
+  
+  .chat-input-container {
+    flex-shrink: 0;
+    position: relative;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
+    padding: 0.75rem;
+    z-index: 10;
+  }
+  
+  /* Fix input focus zoom on iOS */
+  .message-input input,
+  .message-input textarea {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+  }
+  
+  /* Larger touch targets on mobile */
+  .icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 12px;
+  }
+  
+  /* Message bubbles - better touch targets */
+  .message {
+    min-height: 44px;
+    margin-bottom: 0.75rem;
+  }
+  
+  .message-content {
+    font-size: 16px;
+    line-height: 1.5;
+    padding: 12px 16px;
+  }
+  
+  /* Back button on mobile */
+  .back-button.mobile-only {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  /* Fix emoji picker position on mobile */
+  .emoji-picker-wrapper {
+    position: fixed;
+    bottom: 80px;
+    right: 10px;
+    left: 10px;
+    max-width: 100%;
+  }
+  
+  /* Fix file upload overlay on mobile */
+  .upload-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+  }
+  
+  /* Message actions - easier to tap */
+  .message-actions {
+    gap: 0.75rem;
+  }
+  
+  .message-actions button {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .chat-messages {
+    padding: 0.75rem;
+  }
+  
+  .message-content {
+    font-size: 15px;
+    padding: 10px 14px;
+  }
+  
+  .chat-input-container {
+    padding: 0.5rem;
+  }
+}
+
+/* Landscape mode on mobile */
+@media (max-width: 896px) and (orientation: landscape) {
+  .chat-area {
+    height: 100vh;
+  }
+  
+  .chat-messages {
+    padding: 0.5rem;
+  }
+  
+  .chat-header {
+    padding: 0.5rem 1rem;
+  }
+  
+  .chat-input-container {
+    padding: 0.5rem;
+  }
+}
+
+/* Fix for when keyboard is open - additional spacing */
+@media (max-width: 768px) {
+  .chat-input-container.keyboard-open {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  
+  /* Safe area insets for iOS notch */
+  .chat-area {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
