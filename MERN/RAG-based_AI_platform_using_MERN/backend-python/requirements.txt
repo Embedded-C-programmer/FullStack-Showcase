@@ -1,0 +1,33 @@
+# ── Web Framework ──────────────────────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.6
+pydantic-settings==2.7.1
+
+# ── Document Parsing ───────────────────────────────────────────────────────
+pypdf==5.1.0
+python-docx==1.1.2
+markdown==3.7
+tiktoken==0.9.0
+
+# ── ML / Embeddings ────────────────────────────────────────────────────────
+# Install torch FIRST (see SETUP.md):
+#   pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1
+sentence-transformers==3.3.1
+faiss-cpu==1.9.0.post1
+numpy==1.26.4
+
+# ── LLM ───────────────────────────────────────────────────────────────────
+# httpx must be pinned to match openai's transport requirements exactly
+openai==1.60.0
+httpx==0.27.2          # openai 1.60 requires httpx >=0.23,<0.29 — 0.28 caused SSL issues on Windows
+
+# ── HTTP / Async ───────────────────────────────────────────────────────────
+aiofiles==24.1.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+structlog==24.4.0
+tenacity==9.0.0
