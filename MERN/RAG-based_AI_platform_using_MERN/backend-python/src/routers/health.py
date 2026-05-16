@@ -1,20 +1,34 @@
 from fastapi import APIRouter, Request
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter()
 
 
 @router.get("/health")
 async def health(request: Request):
-    embedding_ready = hasattr(request.app.state, "embedding_service")
-    faiss_ready = hasattr(request.app.state, "faiss_service")
+
+    embedding_ready = (
+        getattr(request.app.state, "embedding_service", None) is not None
+    )
+
+    faiss_ready = (
+        getattr(request.app.state, "faiss_service", None) is not None
+    )
 
     return {
         "status": "ok",
         "service": "rag-python-ai",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "components": {
-            "embedding": "ready" if embedding_ready else "not_initialised",
-            "faiss": "ready" if faiss_ready else "not_initialised",
+            "embedding": (
+                "ready"
+                if embedding_ready
+                else "lazy_not_loaded"
+            ),
+            "faiss": (
+                "ready"
+                if faiss_ready
+                else "lazy_not_loaded"
+            ),
         },
     }

@@ -45,7 +45,8 @@ def _parse_chunk_embed(tmp_path: str, doc_id: str, user_id: str,
     if not text.strip():
         raise ValueError("Could not extract any text from document.")
 
-    word_count = len(text.split())
+    # word_count = len(text.split())
+    word_count = text.count(" ") + 1
     log.info("parsed", doc=doc_id, words=word_count, seconds=round(time.time() - t0, 1))
 
     # 2. Chunk
@@ -57,7 +58,7 @@ def _parse_chunk_embed(tmp_path: str, doc_id: str, user_id: str,
 
     # 3. Embed — the slow part; runs in thread so event loop stays free
     t1 = time.time()
-    embeddings = embedding_svc.embed(chunks, batch_size=32)
+    embeddings = embedding_svc.embed(chunks, batch_size=8)
     log.info("embedded", doc=doc_id, n=len(chunks), seconds=round(time.time() - t1, 1))
 
     # 4. Index
@@ -86,8 +87,13 @@ async def process_document(
     Ingest a document: stream to disk → parse → chunk → embed → FAISS.
     Heavy CPU work runs in a ThreadPoolExecutor so the event loop stays free.
     """
-    embedding_svc = request.app.state.embedding_service
-    faiss_svc = request.app.state.faiss_service
+    from ..services.service_factory import (
+    get_embedding_service,
+    get_faiss_service,
+)
+
+    embedding_svc = get_embedding_service(request)
+    faiss_svc = get_faiss_service(request)
 
     log.info("process_start", doc=document_id, user=user_id,
              filename=file.filename, size=file.size)
@@ -138,7 +144,10 @@ async def process_document(
 @router.delete("/documents/{document_id}")
 async def delete_document(document_id: str, user_id: str, request: Request):
     """Remove all FAISS vectors for a document."""
-    faiss_svc = request.app.state.faiss_service
+    from ..services.service_factory import get_faiss_service
+
+    faiss_svc = get_faiss_service(request)
+    
     loop = asyncio.get_event_loop()
     removed = await loop.run_in_executor(
         _executor,

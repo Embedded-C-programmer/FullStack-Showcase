@@ -36,8 +36,14 @@ async def semantic_search(
     Pure semantic search across a user's document corpus.
     Optionally scoped to a single document.
     """
-    embedding_svc = request.app.state.embedding_service
-    faiss_svc = request.app.state.faiss_service
+
+    from ..services.service_factory import (
+        get_embedding_service,
+        get_faiss_service,
+    )
+
+    embedding_svc = get_embedding_service(request)
+    faiss_svc = get_faiss_service(request)
 
     query_emb = embedding_svc.embed_single(q)
 
@@ -49,7 +55,12 @@ async def semantic_search(
         min_score=min_score,
     )
 
-    log.info("semantic_search", user=user_id, query=q[:60], results=len(results))
+    log.info(
+        "semantic_search",
+        user=user_id,
+        query=q[:60],
+        results=len(results),
+    )
 
     return SearchResponse(
         success=True,
@@ -66,10 +77,11 @@ async def semantic_search(
         total=len(results),
     )
 
-
 @router.get("/search/stats")
 async def index_stats(request: Request, user_id: str = Query(...)):
     """Return FAISS index stats for a user."""
-    faiss_svc = request.app.state.faiss_service
+    from ..services.service_factory import get_faiss_service
+
+    faiss_svc = get_faiss_service(request)
     stats = faiss_svc.get_stats(user_id)
     return {"success": True, "data": stats}

@@ -9,34 +9,60 @@ log = structlog.get_logger()
 
 class EmbeddingService:
     """
-    Wraps a SentenceTransformer model.
-    Loaded once at startup; all requests share the same instance.
+    Lazy-loaded SentenceTransformer service.
 
-    Compatible with sentence-transformers >= 3.x (new encode() API).
+    Model loads only on first request instead of app startup.
+    This reduces Render startup memory usage significantly.
     """
 
     def __init__(self):
-        # Lazy-import so the module itself is importable even if torch isn't
-        # installed yet (e.g. during unit-test collection).
-        from sentence_transformers import SentenceTransformer  # noqa: PLC0415
+        self.model = None
+        self.dimension = None
 
-        log.info("loading_embedding_model", model=settings.EMBEDDING_MODEL)
-        self.model = SentenceTransformer(
-            settings.EMBEDDING_MODEL,
-            device=settings.EMBEDDING_DEVICE,
-        )
-        # get_sentence_embedding_dimension() is stable across all ST versions
-        self.dimension = self.model.get_sentence_embedding_dimension()
-        log.info("embedding_model_ready", dimension=self.dimension)
+    def _load_model(self):
+        """
+        Load model only once when actually needed.
+        """
+        if self.model is None:
+            from sentence_transformers import SentenceTransformer
 
-    def embed(self, texts: List[str], batch_size: int = 64) -> np.ndarray:
+            log.info(
+                "loading_embedding_model",
+                model=settings.EMBEDDING_MODEL,
+            )
+
+            self.model = SentenceTransformer(
+                settings.EMBEDDING_MODEL,
+                device=settings.EMBEDDING_DEVICE,
+            )
+
+            self.dimension = (
+                self.model.get_sentence_embedding_dimension()
+            )
+
+            log.info(
+                "embedding_model_ready",
+                dimension=self.dimension,
+            )
+
+    def embed(
+        self,
+        texts: List[str],
+        batch_size: int = 64,
+    ) -> np.ndarray:
         """
         Embed a list of strings.
-        Returns a float32 ndarray of shape (N, dimension).
-        Vectors are L2-normalised so dot-product == cosine similarity.
+        Returns normalized float32 vectors.
         """
+
         if not texts:
+            if self.dimension is None:
+                return np.empty((0, 384), dtype=np.float32)
+
             return np.empty((0, self.dimension), dtype=np.float32)
+
+        # Lazy load happens here
+        self._load_model()
 
         embeddings = self.model.encode(
             texts,
@@ -45,6 +71,7 @@ class EmbeddingService:
             normalize_embeddings=True,
             show_progress_bar=len(texts) > 100,
         )
+
         return embeddings.astype(np.float32)
 
     def embed_single(self, text: str) -> np.ndarray:

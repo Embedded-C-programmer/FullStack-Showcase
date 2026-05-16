@@ -61,23 +61,34 @@ async def rag_chat(body: ChatRequest, request: Request):
     Full RAG pipeline:
     1. Embed the query
     2. Retrieve top-K chunks from FAISS
-    3. Call LLM (or return chunks if no LLM configured)
+    3. Call LLM
     4. Return answer + sources
     """
-    embedding_svc = request.app.state.embedding_service
-    faiss_svc     = request.app.state.faiss_service
-    llm_svc       = get_llm_service()
+
+    from ..services.service_factory import (
+        get_embedding_service,
+        get_faiss_service,
+    )
+
+    embedding_svc = get_embedding_service(request)
+    faiss_svc = get_faiss_service(request)
+
+    llm_svc = get_llm_service()
 
     start = time.time()
 
     if not body.query.strip():
-        raise HTTPException(status_code=400, detail="Query cannot be empty.")
+        raise HTTPException(
+            status_code=400,
+            detail="Query cannot be empty.",
+        )
 
-    # 1. Embed query (runs in thread via embedding_service)
+    # 1. Embed query
     query_emb = embedding_svc.embed_single(body.query)
 
     # 2. Retrieve
-    top_k  = min(body.top_k, settings.TOP_K_RESULTS)
+    top_k = min(body.top_k, settings.TOP_K_RESULTS)
+
     chunks = faiss_svc.search(
         user_id=body.user_id,
         query_embedding=query_emb,
@@ -99,8 +110,8 @@ async def rag_chat(body: ChatRequest, request: Request):
         return ChatResponse(
             success=True,
             answer=(
-                "I couldn't find relevant information in this document to answer your question. "
-                "Try rephrasing, or ask about a topic covered in the document."
+                "I couldn't find relevant information in this document "
+                "to answer your question."
             ),
             sources=[],
             tokens_used=0,
@@ -108,8 +119,12 @@ async def rag_chat(body: ChatRequest, request: Request):
             llm_backend=llm_svc.backend,
         )
 
-    # 3. Generate
-    history = [m.model_dump() for m in (body.conversation_history or [])]
+    # 3. Generate answer
+    history = [
+        m.model_dump()
+        for m in (body.conversation_history or [])
+    ]
+
     answer, tokens_used = await llm_svc.generate(
         query=body.query,
         chunks=chunks,
@@ -117,8 +132,14 @@ async def rag_chat(body: ChatRequest, request: Request):
     )
 
     latency_ms = int((time.time() - start) * 1000)
-    log.info("rag_done", doc=body.document_id, tokens=tokens_used,
-             ms=latency_ms, backend=llm_svc.backend)
+
+    log.info(
+        "rag_done",
+        doc=body.document_id,
+        tokens=tokens_used,
+        ms=latency_ms,
+        backend=llm_svc.backend,
+    )
 
     return ChatResponse(
         success=True,
